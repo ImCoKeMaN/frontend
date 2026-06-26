@@ -102,7 +102,7 @@ static const char *heroes[] = {
         "xraygoggles", "hybrid_sith", "mxdamp", "ownedmumbles", "exe0237",
         "kernelkritic", "verctexius", "misfitsorbet",
         "bigolpeewee", ".zerohalo", "milkworlds", "amildinconvenience.",
-        "turner74.", "jmtn070", "izzythefool", "nahck",
+        "turner74.", "jmtn070", "izzythefool", "nahck", "cjiiio",
         NULL
 };
 
@@ -118,8 +118,9 @@ static const char *knights[] = {
 };
 
 static const char *contributors[] = {
-        "antikk", "bitter_bizarro", "corey", "imcokeman",
-        "key777", "mugwomp93", "xonglebongle",
+        "0xada.3", "antikk", "artur_ditu", "bitter_bizarro", "corey",
+        "imcokeman", "key777", "mugwomp93", "saitamasahil", "thewalruzz",
+        "xikteny", "xonglebongle",
         NULL
 };
 
@@ -162,8 +163,8 @@ static const char *contributors[] = {
 #define LANG_QRCODE "Scan the QR code below to visit the Ko-fi page!"
 
 #define SONG_TITLE   "Supporter Music"
-#define SONG_TRACK   "Embers"
-#define SONG_ARTIST  "???"
+#define SONG_TRACK   "Andromeda"
+#define SONG_ARTIST  "Selfmademusic"
 #define SONG_REBOOT  "Please wait while we reboot…"
 #define SONG_BLESSED "Have a blessed day…"
 
@@ -1234,34 +1235,6 @@ static void render_texture_perspective(SDL_Texture *tex, float x, float y, float
 
         int indices[] = { 0, 1, 2, 2, 1, 3 };
         SDL_RenderGeometry(g_renderer, tex, verts, 4, indices, 6);
-    }
-}
-static void render_block_old(block_t *b, float draw_y) {
-    switch (b->kind) {
-        case BLK_QR: {
-            SDL_FRect dst;
-            dst.x = (float) ((g_screen_w - b->img_w) / 2);
-            dst.y = draw_y;
-            dst.w = (float) b->img_w;
-            dst.h = (float) b->img_h;
-            SDL_RenderCopyF(g_renderer, b->image, NULL, &dst);
-            break;
-        }
-        case BLK_SPACER:
-            break;
-        default: {
-            float y = draw_y;
-            for (int i = 0; i < b->line_count; ++i) {
-                SDL_FRect dst;
-                dst.w = (float) b->line_w[i];
-                dst.h = (float) b->line_h[i];
-                dst.x = (float) ((g_screen_w - b->line_w[i]) / 2);
-                dst.y = y;
-                SDL_RenderCopyF(g_renderer, b->lines[i], NULL, &dst);
-                y += (float) b->line_h[i];
-            }
-            break;
-        }
     }
 }
 
