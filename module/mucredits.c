@@ -14,6 +14,7 @@
 #define MEDIA_DIR SHARE_DIR "media/credits"
 #define RMSG_FILE SHARE_DIR "message.txt"
 #define FONT_FILE SHARE_DIR "font/mucredits.ttf"
+#define PERSPECTIVE_DEPTH 0.42f  // Adjust depth: higher = more slant, lower = flatter
 
 #define REF_H 480
 
@@ -101,7 +102,7 @@ static const char *heroes[] = {
         "xraygoggles", "hybrid_sith", "mxdamp", "ownedmumbles", "exe0237",
         "kernelkritic", "verctexius", "misfitsorbet",
         "bigolpeewee", ".zerohalo", "milkworlds", "amildinconvenience.",
-        "turner74.", "jmtn070", "izzythefool", "nahck", "cjiiio",
+        "turner74.", "jmtn070", "izzythefool", "nahck",
         NULL
 };
 
@@ -117,9 +118,8 @@ static const char *knights[] = {
 };
 
 static const char *contributors[] = {
-        "0xada.3", "antikk", "artur_ditu", "bitter_bizarro", "corey",
-        "imcokeman", "key777", "mugwomp93", "saitamasahil", "thewalruzz",
-        "xikteny", "xonglebongle",
+        "antikk", "bitter_bizarro", "corey", "imcokeman",
+        "key777", "mugwomp93", "xonglebongle",
         NULL
 };
 
@@ -162,8 +162,8 @@ static const char *contributors[] = {
 #define LANG_QRCODE "Scan the QR code below to visit the Ko-fi page!"
 
 #define SONG_TITLE   "Supporter Music"
-#define SONG_TRACK   "Andromeda"
-#define SONG_ARTIST  "Selfmademusic"
+#define SONG_TRACK   "Embers"
+#define SONG_ARTIST  "???"
 #define SONG_REBOOT  "Please wait while we reboot…"
 #define SONG_BLESSED "Have a blessed day…"
 
@@ -1162,8 +1162,81 @@ static void build_reel(void) {
     add_spacer(wrap_tail, "music");
     relayout_reel();
 }
+static void project_point(float px, float py, float *out_x, float *out_y) {
+    // Convert y to a normalized screen position (0.0 at top, 1.0 at bottom)
+    float norm_y = py / (float)g_screen_h;
+    
+    // Calculate z-depth based on our perspective depth setting
+    float z = 1.0f + (1.0f - norm_y) * PERSPECTIVE_DEPTH;
+    float scale = 1.0f / z;
+    
+    float cx = (float)g_screen_w * 0.5f;
+    // Set the optical horizon slightly above the physical screen top
+    float horizon_y = -(float)g_screen_h * 0.12f; 
+    
+    *out_x = cx + (px - cx) * scale;
+    *out_y = horizon_y + (py - horizon_y) * scale;
+}
 
-static void render_block(block_t *b, float draw_y) {
+static void render_texture_perspective(SDL_Texture *tex, float x, float y, float w, float h) {
+    if (!tex) return;
+
+    SDL_Color col = {255, 255, 255, 255};
+    SDL_GetTextureColorMod(tex, &col.r, &col.g, &col.b);
+    SDL_GetTextureAlphaMod(tex, &col.a);
+
+    // Slicing the quad vertically removes the texture warping artifact (diagonal crease)
+    const int SLICES = 8;
+    
+    for (int i = 0; i < SLICES; ++i) {
+        float f_start = (float)i / (float)SLICES;
+        float f_end = (float)(i + 1) / (float)SLICES;
+
+        float slice_y1 = y + h * f_start;
+        float slice_y2 = y + h * f_end;
+
+        // Project the 4 corners of the current horizontal slice
+        float x0, y0, x1, y1, x2, y2, x3, y3;
+        project_point(x,     slice_y1, &x0, &y0); // Top-Left
+        project_point(x + w, slice_y1, &x1, &y1); // Top-Right
+        project_point(x,     slice_y2, &x2, &y2); // Bottom-Left
+        project_point(x + w, slice_y2, &x3, &y3); // Bottom-Right
+
+        SDL_Vertex verts[4];
+        
+        // Top-Left
+        verts[0].position.x = x0;
+        verts[0].position.y = y0;
+        verts[0].tex_coord.x = 0.0f;
+        verts[0].tex_coord.y = f_start;
+        verts[0].color = col;
+
+        // Top-Right
+        verts[1].position.x = x1;
+        verts[1].position.y = y1;
+        verts[1].tex_coord.x = 1.0f;
+        verts[1].tex_coord.y = f_start;
+        verts[1].color = col;
+
+        // Bottom-Left
+        verts[2].position.x = x2;
+        verts[2].position.y = y2;
+        verts[2].tex_coord.x = 0.0f;
+        verts[2].tex_coord.y = f_end;
+        verts[2].color = col;
+
+        // Bottom-Right
+        verts[3].position.x = x3;
+        verts[3].position.y = y3;
+        verts[3].tex_coord.x = 1.0f;
+        verts[3].tex_coord.y = f_end;
+        verts[3].color = col;
+
+        int indices[] = { 0, 1, 2, 2, 1, 3 };
+        SDL_RenderGeometry(g_renderer, tex, verts, 4, indices, 6);
+    }
+}
+static void render_block_old(block_t *b, float draw_y) {
     switch (b->kind) {
         case BLK_QR: {
             SDL_FRect dst;
@@ -1186,6 +1259,30 @@ static void render_block(block_t *b, float draw_y) {
                 dst.y = y;
                 SDL_RenderCopyF(g_renderer, b->lines[i], NULL, &dst);
                 y += (float) b->line_h[i];
+            }
+            break;
+        }
+    }
+}
+
+static void render_block(block_t *b, float draw_y) {
+    switch (b->kind) {
+        case BLK_QR: {
+            float dx = (float)((g_screen_w - b->img_w) / 2);
+            render_texture_perspective(b->image, dx, draw_y, (float)b->img_w, (float)b->img_h);
+            break;
+        }
+        case BLK_SPACER:
+            break;
+        default: {
+            float y = draw_y;
+            for (int i = 0; i < b->line_count; ++i) {
+                float dw = (float)b->line_w[i];
+                float dh = (float)b->line_h[i];
+                float dx = (float)((g_screen_w - b->line_w[i]) / 2);
+                
+                render_texture_perspective(b->lines[i], dx, y, dw, dh);
+                y += dh;
             }
             break;
         }
